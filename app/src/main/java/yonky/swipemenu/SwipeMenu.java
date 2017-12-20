@@ -99,6 +99,10 @@ public class SwipeMenu extends ViewGroup {
 
     @Override
     public boolean dispatchTouchEvent(MotionEvent ev) {
+        if(null==mVelocityTracker){
+            mVelocityTracker = VelocityTracker.obtain();
+        }
+        mVelocityTracker.addMovement(ev);
         switch(ev.getAction()){
             case MotionEvent.ACTION_DOWN:
                 if(sIsTouching){
@@ -118,7 +122,7 @@ public class SwipeMenu extends ViewGroup {
                     if(sSwipeMenu!=this){
                         //如果不是当前view 的话自动关闭
                         sSwipeMenu.collapseSmooth();
-                        getParent().requestDisallowInterceptTouchEvent(true);
+//                        getParent().requestDisallowInterceptTouchEvent(true);
                         isInterceptTouch = true;
 
                     }
@@ -165,19 +169,23 @@ public class SwipeMenu extends ViewGroup {
                     return  false;
                 }
 
+                mVelocityTracker.computeCurrentVelocity(1000,mMaxVelocity);
+                final float velocityX = mVelocityTracker.getXVelocity(mPointerId);
                 if(!isExpand){//如果还没有展开
-                    if(getScrollX()>mExpandLimit ){
+                    if(getScrollX()>mExpandLimit ||(velocityX<-1000&&isInterceptParent) ){
                         expandSmooth();
                     }else{
                         collapseSmooth();
                     }
                 }else {//已经展开的
-                    if(getScrollX()<mCollapseLimit){
+                    if(getScrollX()<mCollapseLimit ||(velocityX>1000 && isInterceptParent)){
                         collapseSmooth();
                     }else{
                         expandSmooth();
                     }
                 }
+              releaseVelocityTracker();
+                break;
         }
         return super.dispatchTouchEvent(ev);
     }
@@ -200,6 +208,24 @@ public class SwipeMenu extends ViewGroup {
             return false;
         }
         return super.performLongClick();
+    }
+
+    @Override
+    protected void onDetachedFromWindow() {
+        if(sSwipeMenu!=null){
+            sSwipeMenu.collapseInstant();
+            sSwipeMenu=null;
+        }
+        super.onDetachedFromWindow();
+    }
+/* 立刻关闭，不显示动画
+     */
+    public void collapseInstant(){
+        if(this ==sSwipeMenu){
+            cancelAnim();
+            sSwipeMenu.scrollTo(0,0);
+            sSwipeMenu=null;
+        }
     }
 
     private ValueAnimator mExpandAnim,mCollapseAnim;
@@ -254,4 +280,13 @@ public class SwipeMenu extends ViewGroup {
             mExpandAnim.cancel();
         }
     }
+    private void releaseVelocityTracker(){
+        if(null !=mVelocityTracker){
+            mVelocityTracker.clear();
+            mVelocityTracker.recycle();
+            mVelocityTracker = null;
+        }
+    }
+
+
 }
